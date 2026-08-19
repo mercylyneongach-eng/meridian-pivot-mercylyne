@@ -1,0 +1,24 @@
+{
+  "name": "meridian-pivot-mercylyne",
+  "version": "1.0.0",
+  "description": "Meridian Pivot Sprint – Individual Learning and Prototype",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mercylyneongach-eng/meridian-pivot-mercylyne.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/mercylyneongach-eng/meridian-pivot-mercylyne/issues"
+  },
+  "homepage": "https://github.com/mercylyneongach-eng/meridian-pivot-mercylyne#readme",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
