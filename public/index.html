@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Meridian Pivot - Inventory Dashboard</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="container">
+
+        <header>
+            <h1>Meridian Pivot</h1>
+            <p class="subtitle">Inventory Management Dashboard</p>
+        </header>
+
+        <!-- Dashboard Summary -->
+        <div class="dashboard-summary">
+
+            <div class="summary-card">
+                <h3>Products Updated</h3>
+                <p id="productCount">0</p>
+            </div>
+
+            <div class="summary-card">
+                <h3>Total Units</h3>
+                <p id="totalQuantity">0</p>
+            </div>
+
+        </div>
+
+        <!-- Stock Update Form -->
+        <section class="card">
+
+            <h2>Stock Update</h2>
+
+            <form id="stockForm">
+
+                <label for="product">Product</label>
+
+                <input
+                    type="text"
+                    id="product"
+                    placeholder="Enter product name"
+                    required
+                >
+
+                <label for="quantity">Quantity</label>
+
+                <input
+                    type="number"
+                    id="quantity"
+                    placeholder="Enter quantity"
+                    min="0"
+                    required
+                >
+
+                <button type="submit">
+                    Send Stock Update
+                </button>
+
+            </form>
+
+            <div id="result"></div>
+
+        </section>
+
+        <!-- Stock History -->
+        <section class="card">
+
+            <div class="history-header">
+
+                <h2>Stock Update History</h2>
+
+                <button
+                    id="clearHistory"
+                    class="clear-button"
+                    type="button"
+                >
+                    Clear History
+                </button>
+
+            </div>
+
+            <div class="table-container">
+
+                <table>
+
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Quantity</th>
+                            <th>Status</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="stockHistory">
+
+                        <tr>
+                            <td colspan="4">
+                                No stock updates yet
+                            </td>
+                        </tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+    </div>
+
+    <script src="script.js"></script>
+
+</body>
+</html>
