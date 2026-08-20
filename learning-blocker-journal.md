@@ -592,5 +592,18 @@ Invalid data test: PASS
 Validation: Working
 Troubleshooting documented: Yes
 
+Day 2 Summary 
+
+Today, I extended my Meridian Pivot webhook prototype by adding a virtual frontend using HTML, CSS, and JavaScript and connecting it to my Node.js/Express backend. I encountered a “Cannot GET /” error and learned how to serve the frontend using express.static("public"). I also experienced backend connection issues and learned how to troubleshoot the Node.js process and restart the server when Ctrl+C did not work.
+
+I added persistent storage using stock-data.json, allowing inventory updates to remain available after refreshing the dashboard. When the history initially disappeared after refreshing, I checked the JSON file to confirm that the data was being saved and then fixed the frontend so it loads the saved history from the backend.
+
+I also created and tested a GET /stock/:product endpoint, which allows the system to return the latest quantity and stock status for a product. I tested the webhook and inventory endpoint directly using PowerShell.
+
+Finally, I committed my changes to GitHub and pushed them to the main branch. Render successfully detected the changes and deployed the updated version.
+
+Final outcome: I successfully transformed my basic webhook prototype into a functional Meridian Pivot inventory MVP with a virtual frontend, backend API, persistent storage, stock history, stock status, inventory querying, GitHub version control, and Render deployment.
+
+
 
 
