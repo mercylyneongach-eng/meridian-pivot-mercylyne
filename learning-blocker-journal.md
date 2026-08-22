@@ -605,5 +605,160 @@ Finally, I committed my changes to GitHub and pushed them to the main branch. Re
 Final outcome: I successfully transformed my basic webhook prototype into a functional Meridian Pivot inventory MVP with a virtual frontend, backend API, persistent storage, stock history, stock status, inventory querying, GitHub version control, and Render deployment.
 
 
+Meridian Pivot Event – Asynchronous Event Check-In
+Pivot Context
 
+The original prototype focused on learning webhooks and building a Node.js and Express application. During the Meridian Pivot Simulation, the client requirement changed. The original synchronous badge-printer API was being deprecated, so the check-in service could no longer wait for an immediate printer response.
+
+The new requirement was to use an asynchronous architecture where the kiosk publishes a badge-print request to a message queue and waits for the printer vendor to send a webhook confirmation when the badge has actually been printed.
+
+Original Approach
+
+The original client workflow was synchronous:
+
+QR code scan → Call printer API → Wait for response → Show "Checked In"
+
+This approach was no longer suitable because the vendor was deprecating the synchronous printing API.
+
+New Pivot Approach
+
+I redesigned the check-in flow to use an asynchronous model:
+
+QR code scan → Create print request → Queue request → Show "Pending" → Receive printer webhook → Show "Checked In"
+
+The application now separates the initial check-in request from the final confirmation that the badge has been printed.
+
+Technologies Used
+Node.js
+Express.js
+JavaScript
+HTML/CSS
+REST-style endpoints
+Webhooks
+Simulated message queue
+Git and GitHub
+Implementation Work
+
+I adapted the existing Node.js and Express project instead of creating a separate repository.
+
+The backend was redesigned to include:
+
+An attendee data structure containing three test attendees.
+A /check-in endpoint for processing QR-code scans.
+A simulated print-message queue.
+A /print-queue endpoint for viewing queued print requests.
+A /printer-webhook endpoint for receiving printer completion callbacks.
+A Pending state so an attendee is not immediately marked as checked in.
+A Checked In state that is only reached after printer confirmation.
+Duplicate-scan protection.
+Print-job ID validation to prevent an old or incorrect webhook from changing an attendee's status.
+A /reset-demo endpoint for resetting the test environment.
+Frontend Changes
+
+I replaced the original inventory dashboard interface with a Solstice Events check-in kiosk interface.
+
+The new interface allows staff to:
+
+Select an attendee to simulate a QR-code scan.
+Submit a check-in request.
+See the Pending state while the badge is being printed.
+Simulate the printer webhook confirmation.
+See Checked In only after the print confirmation.
+Receive a duplicate-scan message when an attendee has already been checked in.
+Testing Performed
+
+I tested the system using three attendees:
+
+A001 – Alice Wanjiku
+A002 – Brian Otieno
+A003 – Carol Akinyi
+Test 1 – Normal asynchronous check-in
+
+A001 was scanned successfully.
+
+The system returned a pending response and changed the attendee status to Pending.
+
+After the simulated printer webhook confirmed that the badge was printed, A001 changed to Checked In.
+
+This confirmed that the application does not mark an attendee as checked in before the printer confirmation is received.
+
+Test 2 – Multiple attendees
+
+A002 and A003 were both scanned and placed into the Pending state.
+
+Both print requests were assigned unique print-job IDs.
+
+Test 3 – Out-of-order confirmations
+
+A003's printer confirmation was deliberately received before A002's confirmation even though A002 was scanned first.
+
+A003 changed to Checked In while A002 remained Pending.
+
+A002 was then confirmed separately and changed to Checked In.
+
+This demonstrated that the system does not depend on webhook confirmations arriving in the same order as the original scans.
+
+Test 4 – Duplicate scan
+
+After A001 had already been checked in, I scanned A001 again.
+
+The system returned a conflict response with the message:
+
+"Duplicate scan - badge will not be printed again."
+
+A001 remained Checked In, and a second print request was not created.
+
+This confirmed that duplicate badge printing is prevented.
+
+Blockers Encountered and Solutions
+Blocker 1 – Stopping the Node.js server
+
+I initially could not stop the running Node.js server using Ctrl+C.
+
+I solved this by opening another PowerShell window, navigating to the project directory, checking the running Node process, and using:
+
+Stop-Process -Name node -Force
+
+This allowed me to restart the application with the updated code.
+
+Blocker 2 – Incorrect print-job ID during webhook testing
+
+I initially attempted to send the printer webhook using placeholder values such as REPLACE_WITH_JOB_ID and YOUR_JOB_ID.
+
+The application correctly rejected these requests because the webhook job ID did not match the attendee's current print job.
+
+I resolved this by querying the /attendees endpoint, retrieving the actual printJobId, and using that ID in the webhook request.
+
+This also helped me understand why unique job identifiers are important for asynchronous systems.
+
+Blocker 3 – Existing inventory frontend
+
+The original frontend was an inventory dashboard and did not match the new Solstice Events requirements.
+
+I adapted the existing frontend into an event check-in kiosk instead of creating a completely separate project.
+
+Key Learning Areas
+
+The pivot helped me understand that asynchronous systems cannot assume that a request will immediately produce its final result.
+
+I learned the importance of:
+
+Separating request acceptance from completion.
+Representing intermediate states such as Pending.
+Using unique job IDs to track asynchronous work.
+Using webhooks for completion notifications.
+Protecting systems against duplicate requests.
+Handling callbacks that arrive out of order.
+Updating the user interface based on backend state.
+Testing both successful and failure/duplicate scenarios.
+Adapting an existing project when client requirements change.
+Final Outcome
+
+The final prototype successfully demonstrates an asynchronous event check-in service for Solstice Events Co.
+
+The system accepts QR-code check-ins, places badge-print requests into a simulated message queue, displays a Pending state, receives printer completion through a webhook, and only then changes the attendee to Checked In.
+
+The system also prevents duplicate badge printing and correctly handles printer confirmations arriving out of order.
+
+The prototype was tested with three attendees and successfully demonstrated the required client scenarios.
 

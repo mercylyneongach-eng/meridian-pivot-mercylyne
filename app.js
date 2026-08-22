@@ -1,247 +1,187 @@
 const express = require("express");
-const fs = require("fs");
-const path = require("path");
 
 const app = express();
 
 app.use(express.json());
-
-// Serve the virtual frontend
 app.use(express.static("public"));
 
 
 // ==========================================
-// STORAGE
+// ATTENDEE DATA
 // ==========================================
 
-const dataFile = path.join(__dirname, "stock-data.json");
+const attendees = new Map([
+    ["A001", {
+        id: "A001",
+        name: "Alice Wanjiku",
+        status: "Not Checked In",
+        printJobId: null
+    }],
+
+    ["A002", {
+        id: "A002",
+        name: "Brian Otieno",
+        status: "Not Checked In",
+        printJobId: null
+    }],
+
+    ["A003", {
+        id: "A003",
+        name: "Carol Akinyi",
+        status: "Not Checked In",
+        printJobId: null
+    }]
+]);
 
 
-// Create storage file if it doesn't exist
-if (!fs.existsSync(dataFile)) {
-    fs.writeFileSync(dataFile, "[]");
-}
+// ==========================================
+// SIMULATED MESSAGE QUEUE
+// ==========================================
+
+const printQueue = [];
 
 
-// Read stock data
-function readStockData() {
+// ==========================================
+// GET ALL ATTENDEES
+// ==========================================
 
-    try {
+app.get("/attendees", (req, res) => {
 
-        const data = fs.readFileSync(
-            dataFile,
-            "utf8"
-        );
-
-        return JSON.parse(data);
-
-    } catch (error) {
-
-        console.error(
-            "Error reading stock data:",
-            error
-        );
-
-        return [];
-    }
-}
-
-
-// Save stock data
-function saveStockData(data) {
-
-    fs.writeFileSync(
-        dataFile,
-        JSON.stringify(data, null, 2)
+    res.json(
+        Array.from(attendees.values())
     );
-}
-
-
-// ==========================================
-// GET STOCK HISTORY
-// ==========================================
-
-app.get("/stock-history", (req, res) => {
-
-    const stockData = readStockData();
-
-    res.json(stockData);
 
 });
 
 
 // ==========================================
-// QUERY CURRENT STOCK
+// CHECK-IN / QR SCAN
 // ==========================================
 
-app.get("/stock/:product", (req, res) => {
+app.post("/check-in", (req, res) => {
 
-    const requestedProduct =
-        req.params.product;
-
-
-    const stockData =
-        readStockData();
+    const attendeeId =
+        req.body.attendeeId;
 
 
-    // Find the most recent update
-    const matchingUpdates =
-        stockData.filter(item =>
-            item.product.toLowerCase() ===
-            requestedProduct.toLowerCase()
-        );
+    // Validate attendee ID
+    if (!attendeeId) {
+
+        return res.status(400).json({
+
+            message:
+                "Attendee ID is required"
+
+        });
+
+    }
 
 
-    // Product does not exist
-    if (matchingUpdates.length === 0) {
+    // Find attendee
+    const attendee =
+        attendees.get(attendeeId);
+
+
+    // Attendee does not exist
+    if (!attendee) {
 
         return res.status(404).json({
 
-            message: "Product not found",
-
-            product: requestedProduct
-
-        });
-
-    }
-
-
-    // Get most recent update
-    const latestUpdate =
-        matchingUpdates[
-            matchingUpdates.length - 1
-        ];
-
-
-    // Determine stock status
-    let status;
-
-
-    if (latestUpdate.quantity === 0) {
-
-        status = "Out of Stock";
-
-    } else if (latestUpdate.quantity <= 10) {
-
-        status = "Low Stock";
-
-    } else {
-
-        status = "In Stock";
-
-    }
-
-
-    res.json({
-
-        product: latestUpdate.product,
-
-        quantity: latestUpdate.quantity,
-
-        status: status,
-
-        timestamp: latestUpdate.timestamp
-
-    });
-
-});
-
-
-// ==========================================
-// WEBHOOK
-// ==========================================
-
-app.post("/webhook", (req, res) => {
-
-    const product = req.body.product;
-
-    const quantity = req.body.quantity;
-
-
-    // Validate product
-
-    if (!product) {
-
-        return res.status(400).json({
-
-            message: "Product is required"
+            message:
+                "Attendee not found"
 
         });
 
     }
 
 
-    // Validate quantity
+    // ======================================
+    // DUPLICATE SCAN PROTECTION
+    // ======================================
 
     if (
-        quantity === undefined ||
-        quantity === null ||
-        quantity === "" ||
-        Number(quantity) < 0
+        attendee.status === "Pending" ||
+        attendee.status === "Checked In"
     ) {
 
-        return res.status(400).json({
+        return res.status(409).json({
 
-            message: "A valid quantity is required"
+            message:
+                "Duplicate scan - badge will not be printed again",
+
+            attendee:
+                attendee
 
         });
 
     }
 
 
-    const stockUpdate = {
+    // ======================================
+    // CREATE PRINT JOB
+    // ======================================
 
-        product: product,
+    const printJobId =
+        `JOB-${Date.now()}-${attendeeId}`;
 
-        quantity: Number(quantity),
 
-        timestamp: new Date().toISOString()
+    // Change state to Pending
+    attendee.status =
+        "Pending";
+
+
+    // Store current print job
+    attendee.printJobId =
+        printJobId;
+
+
+    // Create message
+    const printRequest = {
+
+        printJobId:
+            printJobId,
+
+        attendeeId:
+            attendeeId,
+
+        status:
+            "Queued",
+
+        createdAt:
+            new Date().toISOString()
 
     };
 
 
-    // Read existing data
+    // ======================================
+    // PUBLISH TO MESSAGE QUEUE
+    // ======================================
 
-    const stockData =
-        readStockData();
-
-
-    // Add update
-
-    stockData.push(stockUpdate);
-
-
-    // Save data
-
-    saveStockData(stockData);
-
-
-    console.log(
-        "Stock update received:"
-    );
-
-    console.log(
-        "Product:",
-        product
-    );
-
-    console.log(
-        "Quantity:",
-        quantity
+    printQueue.push(
+        printRequest
     );
 
 
-    res.status(200).json({
+    console.log(
+        "Print request published to queue:",
+        printRequest
+    );
+
+
+    // ======================================
+    // RETURN PENDING RESPONSE
+    // ======================================
+
+    return res.status(202).json({
 
         message:
-            "Stock update received successfully",
+            "Check-in accepted. Badge printing is pending.",
 
-        product: product,
+        attendee:
+            attendee,
 
-        quantity: Number(quantity),
-
-        timestamp:
-            stockUpdate.timestamp
+        printJob:
+            printRequest
 
     });
 
@@ -249,17 +189,314 @@ app.post("/webhook", (req, res) => {
 
 
 // ==========================================
-// CLEAR STOCK HISTORY
+// VIEW PRINT QUEUE
 // ==========================================
 
-app.delete("/stock-history", (req, res) => {
+app.get("/print-queue", (req, res) => {
 
-    saveStockData([]);
+    res.json(
+        printQueue
+    );
+
+});
+
+
+// ==========================================
+// PRINTER WEBHOOK
+// ==========================================
+
+app.post("/printer-webhook", (req, res) => {
+
+    const {
+        printJobId,
+        attendeeId,
+        status
+    } = req.body;
+
+
+    // ======================================
+    // VALIDATE WEBHOOK
+    // ======================================
+
+    if (
+        !printJobId ||
+        !attendeeId ||
+        !status
+    ) {
+
+        return res.status(400).json({
+
+            message:
+                "printJobId, attendeeId and status are required"
+
+        });
+
+    }
+
+
+    // Find attendee
+    const attendee =
+        attendees.get(attendeeId);
+
+
+    if (!attendee) {
+
+        return res.status(404).json({
+
+            message:
+                "Attendee not found"
+
+        });
+
+    }
+
+
+    // ======================================
+    // OUT-OF-ORDER / OLD JOB PROTECTION
+    // ======================================
+
+    if (
+        attendee.printJobId !== printJobId
+    ) {
+
+        return res.status(409).json({
+
+            message:
+                "Webhook does not match the attendee's current print job"
+
+        });
+
+    }
+
+
+    // ======================================
+    // PRINT COMPLETED
+    // ======================================
+
+    if (
+        status === "completed"
+    ) {
+
+        attendee.status =
+            "Checked In";
+
+
+        // Update queue record
+        const job =
+            printQueue.find(
+                item =>
+                    item.printJobId ===
+                    printJobId
+            );
+
+
+        if (job) {
+
+            job.status =
+                "completed";
+
+            job.completedAt =
+                new Date().toISOString();
+
+        }
+
+
+        console.log(
+            `Badge printed successfully for ${attendee.name}`
+        );
+
+
+        return res.json({
+
+            message:
+                "Print confirmed. Attendee is now checked in.",
+
+            attendee:
+                attendee
+
+        });
+
+    }
+
+
+    // ======================================
+    // PRINT FAILED
+    // ======================================
+
+    if (
+        status === "failed"
+    ) {
+
+        attendee.status =
+            "Not Checked In";
+
+
+        const job =
+            printQueue.find(
+                item =>
+                    item.printJobId ===
+                    printJobId
+            );
+
+
+        if (job) {
+
+            job.status =
+                "failed";
+
+            job.completedAt =
+                new Date().toISOString();
+
+        }
+
+
+        return res.json({
+
+            message:
+                "Badge printing failed. Attendee remains unchecked in.",
+
+            attendee:
+                attendee
+
+        });
+
+    }
+
+
+    // ======================================
+    // UNKNOWN STATUS
+    // ======================================
+
+    return res.status(400).json({
+
+        message:
+            "Unknown print status"
+
+    });
+
+});
+
+
+// ==========================================
+// SIMULATE PRINTER
+// ==========================================
+
+app.post("/simulate-printer", (req, res) => {
+
+    const {
+        printJobId,
+        status = "completed"
+    } = req.body;
+
+
+    // Find print job
+    const job =
+        printQueue.find(
+            item =>
+                item.printJobId ===
+                printJobId
+        );
+
+
+    if (!job) {
+
+        return res.status(404).json({
+
+            message:
+                "Print job not found"
+
+        });
+
+    }
+
+
+    // ======================================
+    // SEND CALLBACK THROUGH WEBHOOK
+    // ======================================
+
+    const attendee =
+        attendees.get(
+            job.attendeeId
+        );
+
+
+    if (!attendee) {
+
+        return res.status(404).json({
+
+            message:
+                "Attendee not found"
+
+        });
+
+    }
+
+
+    // Simulate vendor callback
+    attendee.status =
+        status === "completed"
+            ? "Checked In"
+            : "Not Checked In";
+
+
+    job.status =
+        status;
+
 
     res.json({
 
         message:
-            "Stock history cleared successfully"
+            "Printer callback simulated successfully",
+
+        printJob:
+            job,
+
+        attendee:
+            attendee
+
+    });
+
+});
+
+
+// ==========================================
+// RESET DEMO DATA
+// ==========================================
+
+app.post("/reset-demo", (req, res) => {
+
+    attendees.forEach(
+        attendee => {
+
+            attendee.status =
+                "Not Checked In";
+
+            attendee.printJobId =
+                null;
+
+        }
+    );
+
+
+    // Clear message queue
+    printQueue.length =
+        0;
+
+
+    console.log(
+        "Demo data reset successfully"
+    );
+
+
+    res.json({
+
+        message:
+            "Demo data reset successfully",
+
+        attendees:
+            Array.from(
+                attendees.values()
+            )
 
     });
 
@@ -274,10 +511,13 @@ const PORT =
     process.env.PORT || 3000;
 
 
-app.listen(PORT, () => {
+app.listen(
+    PORT,
+    () => {
 
-    console.log(
-        `Webhook server is running on port ${PORT}`
-    );
+        console.log(
+            `Solstice Events check-in service running on port ${PORT}`
+        );
 
-});
+    }
+);

@@ -4,120 +4,685 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Meridian Pivot - Inventory Dashboard</title>
+    <title>Solstice Events - Check-In Kiosk</title>
 
-    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: #f4f6f8;
+            color: #222;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #666;
+        }
+
+        .check-in-panel,
+        .attendee-list {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        select,
+        button {
+            padding: 12px;
+            font-size: 16px;
+            border-radius: 5px;
+        }
+
+        select {
+            width: 60%;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            cursor: pointer;
+            margin-left: 8px;
+            border: none;
+            background: #222;
+            color: white;
+        }
+
+        button:hover {
+            opacity: 0.85;
+        }
+
+        .message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+        }
+
+        .pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .checked-in {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .duplicate {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .attendee {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .attendee:last-child {
+            border-bottom: none;
+        }
+
+        .status {
+            font-weight: bold;
+        }
+
+        .status.pending {
+            background: none;
+            color: #b26a00;
+        }
+
+        .status.checked-in {
+            background: none;
+            color: #16803a;
+        }
+
+        .status.not-checked-in {
+            background: none;
+            color: #777;
+        }
+
+        .instructions {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .instructions strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
 </head>
 
 <body>
 
-    <div class="container">
+<div class="container">
 
-        <header>
-            <h1>Meridian Pivot</h1>
-            <p class="subtitle">Inventory Management Dashboard</p>
-        </header>
+    <header>
+        <h1>Solstice Events</h1>
 
-        <!-- Dashboard Summary -->
-        <div class="dashboard-summary">
+        <p class="subtitle">
+            Tech Conference Attendee Check-In Kiosk
+        </p>
+    </header>
 
-            <div class="summary-card">
-                <h3>Products Updated</h3>
-                <p id="productCount">0</p>
-            </div>
 
-            <div class="summary-card">
-                <h3>Total Units</h3>
-                <p id="totalQuantity">0</p>
-            </div>
+    <!-- CHECK-IN SECTION -->
+
+    <section class="check-in-panel">
+
+        <h2>Scan Attendee QR Code</h2>
+
+        <p>
+            Select an attendee to simulate scanning their QR code.
+        </p>
+
+        <select id="attendeeSelect">
+
+            <option value="">
+                Select attendee
+            </option>
+
+        </select>
+
+        <button onclick="checkIn()">
+            Scan QR Code
+        </button>
+
+        <button onclick="simulatePrinter()">
+            Simulate Printer Confirmation
+        </button>
+
+        <div id="message" class="message"></div>
+
+
+        <div class="instructions">
+
+            <strong>Check-in flow:</strong>
+
+            Scan an attendee → Pending → Printer confirmation → Checked In
 
         </div>
 
-        <!-- Stock Update Form -->
-        <section class="card">
+    </section>
 
-            <h2>Stock Update</h2>
 
-            <form id="stockForm">
+    <!-- ATTENDEE STATUS -->
 
-                <label for="product">Product</label>
+    <section class="attendee-list">
 
-                <input
-                    type="text"
-                    id="product"
-                    placeholder="Enter product name"
-                    required
-                >
+        <h2>Attendee Status</h2>
 
-                <label for="quantity">Quantity</label>
+        <div id="attendees">
+            Loading attendees...
+        </div>
 
-                <input
-                    type="number"
-                    id="quantity"
-                    placeholder="Enter quantity"
-                    min="0"
-                    required
-                >
+    </section>
 
-                <button type="submit">
-                    Send Stock Update
-                </button>
+</div>
 
-            </form>
 
-            <div id="result"></div>
+<script>
 
-        </section>
 
-        <!-- Stock History -->
-        <section class="card">
+// ==========================================
+// LOAD ATTENDEES
+// ==========================================
 
-            <div class="history-header">
+async function loadAttendees() {
 
-                <h2>Stock Update History</h2>
+    try {
 
-                <button
-                    id="clearHistory"
-                    class="clear-button"
-                    type="button"
-                >
-                    Clear History
-                </button>
+        const response =
+            await fetch("/attendees");
 
-            </div>
+        const attendees =
+            await response.json();
 
-            <div class="table-container">
+        const container =
+            document.getElementById("attendees");
 
-                <table>
+        const select =
+            document.getElementById("attendeeSelect");
 
-                    <thead>
-                        <tr>
-                            <th>Product</th>
-                            <th>Quantity</th>
-                            <th>Status</th>
-                            <th>Time</th>
-                        </tr>
-                    </thead>
 
-                    <tbody id="stockHistory">
+        container.innerHTML = "";
 
-                        <tr>
-                            <td colspan="4">
-                                No stock updates yet
-                            </td>
-                        </tr>
 
-                    </tbody>
+        attendees.forEach(attendee => {
 
-                </table>
+            // ==================================
+            // CREATE STATUS ROW
+            // ==================================
 
-            </div>
+            const row =
+                document.createElement("div");
 
-        </section>
+            row.className = "attendee";
 
-    </div>
 
-    <script src="script.js"></script>
+            const name =
+                document.createElement("span");
+
+            name.textContent =
+                `${attendee.id} - ${attendee.name}`;
+
+
+            const status =
+                document.createElement("span");
+
+            status.className = "status";
+
+
+            // ==================================
+            // DISPLAY STATUS
+            // ==================================
+
+            if (attendee.status === "Pending") {
+
+                status.classList.add("pending");
+
+                status.textContent =
+                    "⏳ Pending";
+
+            }
+
+            else if (
+                attendee.status === "Checked In"
+            ) {
+
+                status.classList.add("checked-in");
+
+                status.textContent =
+                    "✓ Checked In";
+
+            }
+
+            else {
+
+                status.classList.add(
+                    "not-checked-in"
+                );
+
+                status.textContent =
+                    "Not Checked In";
+
+            }
+
+
+            row.appendChild(name);
+
+            row.appendChild(status);
+
+            container.appendChild(row);
+
+
+            // ==================================
+            // ADD TO DROPDOWN
+            // ==================================
+
+            if (
+                !Array.from(select.options)
+                    .some(
+                        option =>
+                            option.value === attendee.id
+                    )
+            ) {
+
+                const option =
+                    document.createElement("option");
+
+                option.value =
+                    attendee.id;
+
+                option.textContent =
+                    `${attendee.id} - ${attendee.name}`;
+
+                select.appendChild(option);
+
+            }
+
+        });
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Error loading attendees:",
+            error
+        );
+
+        showMessage(
+            "Unable to load attendee information.",
+            "duplicate"
+        );
+
+    }
+
+}
+
+
+// ==========================================
+// CHECK IN ATTENDEE
+// ==========================================
+
+async function checkIn() {
+
+    const select =
+        document.getElementById("attendeeSelect");
+
+    const attendeeId =
+        select.value;
+
+
+    if (!attendeeId) {
+
+        showMessage(
+            "Please select an attendee.",
+            "duplicate"
+        );
+
+        return;
+
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+                "/check-in",
+                {
+
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+
+                        attendeeId:
+                            attendeeId
+
+                    })
+
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        // ==================================
+        // NEW CHECK-IN
+        // ==================================
+
+        if (response.status === 202) {
+
+            showMessage(
+
+                "Check-in accepted. Badge printing is pending.",
+
+                "pending"
+
+            );
+
+        }
+
+
+        // ==================================
+        // DUPLICATE SCAN
+        // ==================================
+
+        else if (response.status === 409) {
+
+            showMessage(
+
+                "Duplicate scan - badge will not be printed again.",
+
+                "duplicate"
+
+            );
+
+        }
+
+
+        // ==================================
+        // OTHER ERROR
+        // ==================================
+
+        else {
+
+            showMessage(
+
+                data.message ||
+                "Unable to process check-in.",
+
+                "duplicate"
+
+            );
+
+        }
+
+
+        await loadAttendees();
+
+    }
+
+    catch (error) {
+
+        console.error(error);
+
+        showMessage(
+
+            "Unable to connect to the check-in service.",
+
+            "duplicate"
+
+        );
+
+    }
+
+}
+
+
+// ==========================================
+// SIMULATE PRINTER CONFIRMATION
+// ==========================================
+
+async function simulatePrinter() {
+
+    const select =
+        document.getElementById("attendeeSelect");
+
+    const attendeeId =
+        select.value;
+
+
+    if (!attendeeId) {
+
+        showMessage(
+
+            "Please select an attendee.",
+
+            "duplicate"
+
+        );
+
+        return;
+
+    }
+
+
+    try {
+
+        // ==================================
+        // GET CURRENT ATTENDEES
+        // ==================================
+
+        const response =
+            await fetch("/attendees");
+
+        const attendees =
+            await response.json();
+
+
+        const attendee =
+            attendees.find(
+
+                item =>
+                    item.id === attendeeId
+
+            );
+
+
+        if (!attendee) {
+
+            showMessage(
+
+                "Attendee not found.",
+
+                "duplicate"
+
+            );
+
+            return;
+
+        }
+
+
+        // ==================================
+        // MAKE SURE PRINT IS PENDING
+        // ==================================
+
+        if (
+            attendee.status !== "Pending"
+        ) {
+
+            showMessage(
+
+                "There is no pending print job for this attendee.",
+
+                "duplicate"
+
+            );
+
+            return;
+
+        }
+
+
+        // ==================================
+        // CALL PRINTER WEBHOOK
+        // ==================================
+
+        const webhookResponse =
+            await fetch(
+
+                "/printer-webhook",
+
+                {
+
+                    method: "POST",
+
+                    headers: {
+
+                        "Content-Type":
+                            "application/json"
+
+                    },
+
+                    body: JSON.stringify({
+
+                        printJobId:
+                            attendee.printJobId,
+
+                        attendeeId:
+                            attendee.id,
+
+                        status:
+                            "completed"
+
+                    })
+
+                }
+
+            );
+
+
+        const data =
+            await webhookResponse.json();
+
+
+        if (webhookResponse.ok) {
+
+            showMessage(
+
+                "Badge printed successfully. Attendee is now Checked In.",
+
+                "checked-in"
+
+            );
+
+        }
+
+        else {
+
+            showMessage(
+
+                data.message ||
+                "Printer confirmation failed.",
+
+                "duplicate"
+
+            );
+
+        }
+
+
+        // ==================================
+        // REFRESH STATUS
+        // ==================================
+
+        await loadAttendees();
+
+    }
+
+    catch (error) {
+
+        console.error(error);
+
+        showMessage(
+
+            "Unable to simulate printer confirmation.",
+
+            "duplicate"
+
+        );
+
+    }
+
+}
+
+
+// ==========================================
+// DISPLAY MESSAGE
+// ==========================================
+
+function showMessage(
+    text,
+    type
+) {
+
+    const message =
+        document.getElementById("message");
+
+
+    message.textContent =
+        text;
+
+
+    message.style.display =
+        "block";
+
+
+    message.className =
+        `message ${type}`;
+
+}
+
+
+// ==========================================
+// INITIAL LOAD
+// ==========================================
+
+loadAttendees();
+
+
+</script>
 
 </body>
 </html>
