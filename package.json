@@ -1,9 +1,10 @@
 {
   "name": "meridian-pivot-mercylyne",
   "version": "1.0.0",
-  "description": "Meridian Pivot Sprint – Individual Learning and Prototype",
-  "main": "index.js",
+  "description": "Meridian Pivot Sprint - Individual Learning and Prototype",
+  "main": "app.js",
   "scripts": {
+    "start": "node app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
