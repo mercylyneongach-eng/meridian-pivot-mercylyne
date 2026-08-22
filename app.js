@@ -17,14 +17,12 @@ const attendees = new Map([
         status: "Not Checked In",
         printJobId: null
     }],
-
     ["A002", {
         id: "A002",
         name: "Brian Otieno",
         status: "Not Checked In",
         printJobId: null
     }],
-
     ["A003", {
         id: "A003",
         name: "Carol Akinyi",
@@ -47,9 +45,7 @@ const printQueue = [];
 
 app.get("/attendees", (req, res) => {
 
-    res.json(
-        Array.from(attendees.values())
-    );
+    res.json(Array.from(attendees.values()));
 
 });
 
@@ -60,36 +56,22 @@ app.get("/attendees", (req, res) => {
 
 app.post("/check-in", (req, res) => {
 
-    const attendeeId =
-        req.body.attendeeId;
+    const attendeeId = req.body.attendeeId;
 
-
-    // Validate attendee ID
     if (!attendeeId) {
 
         return res.status(400).json({
-
-            message:
-                "Attendee ID is required"
-
+            message: "Attendee ID is required"
         });
 
     }
 
+    const attendee = attendees.get(attendeeId);
 
-    // Find attendee
-    const attendee =
-        attendees.get(attendeeId);
-
-
-    // Attendee does not exist
     if (!attendee) {
 
         return res.status(404).json({
-
-            message:
-                "Attendee not found"
-
+            message: "Attendee not found"
         });
 
     }
@@ -106,11 +88,9 @@ app.post("/check-in", (req, res) => {
 
         return res.status(409).json({
 
-            message:
-                "Duplicate scan - badge will not be printed again",
+            message: "Duplicate scan - badge will not be printed again",
 
-            attendee:
-                attendee
+            attendee: attendee
 
         });
 
@@ -118,48 +98,32 @@ app.post("/check-in", (req, res) => {
 
 
     // ======================================
-    // CREATE PRINT JOB
+    // CREATE ASYNC PRINT REQUEST
     // ======================================
 
     const printJobId =
         `JOB-${Date.now()}-${attendeeId}`;
 
 
-    // Change state to Pending
-    attendee.status =
-        "Pending";
+    attendee.status = "Pending";
+    attendee.printJobId = printJobId;
 
 
-    // Store current print job
-    attendee.printJobId =
-        printJobId;
-
-
-    // Create message
     const printRequest = {
 
-        printJobId:
-            printJobId,
+        printJobId: printJobId,
 
-        attendeeId:
-            attendeeId,
+        attendeeId: attendeeId,
 
-        status:
-            "Queued",
+        status: "Queued",
 
-        createdAt:
-            new Date().toISOString()
+        createdAt: new Date().toISOString()
 
     };
 
 
-    // ======================================
-    // PUBLISH TO MESSAGE QUEUE
-    // ======================================
-
-    printQueue.push(
-        printRequest
-    );
+    // Publish message to simulated queue
+    printQueue.push(printRequest);
 
 
     console.log(
@@ -168,20 +132,13 @@ app.post("/check-in", (req, res) => {
     );
 
 
-    // ======================================
-    // RETURN PENDING RESPONSE
-    // ======================================
+    res.status(202).json({
 
-    return res.status(202).json({
+        message: "Check-in accepted. Badge printing is pending.",
 
-        message:
-            "Check-in accepted. Badge printing is pending.",
+        attendee: attendee,
 
-        attendee:
-            attendee,
-
-        printJob:
-            printRequest
+        printJob: printRequest
 
     });
 
@@ -194,9 +151,7 @@ app.post("/check-in", (req, res) => {
 
 app.get("/print-queue", (req, res) => {
 
-    res.json(
-        printQueue
-    );
+    res.json(printQueue);
 
 });
 
@@ -214,15 +169,7 @@ app.post("/printer-webhook", (req, res) => {
     } = req.body;
 
 
-    // ======================================
-    // VALIDATE WEBHOOK
-    // ======================================
-
-    if (
-        !printJobId ||
-        !attendeeId ||
-        !status
-    ) {
+    if (!printJobId || !attendeeId || !status) {
 
         return res.status(400).json({
 
@@ -234,17 +181,13 @@ app.post("/printer-webhook", (req, res) => {
     }
 
 
-    // Find attendee
-    const attendee =
-        attendees.get(attendeeId);
-
+    const attendee = attendees.get(attendeeId);
 
     if (!attendee) {
 
         return res.status(404).json({
 
-            message:
-                "Attendee not found"
+            message: "Attendee not found"
 
         });
 
@@ -252,12 +195,10 @@ app.post("/printer-webhook", (req, res) => {
 
 
     // ======================================
-    // OUT-OF-ORDER / OLD JOB PROTECTION
+    // IGNORE UNKNOWN / OLD JOBS
     // ======================================
 
-    if (
-        attendee.printJobId !== printJobId
-    ) {
+    if (attendee.printJobId !== printJobId) {
 
         return res.status(409).json({
 
@@ -270,39 +211,18 @@ app.post("/printer-webhook", (req, res) => {
 
 
     // ======================================
-    // PRINT COMPLETED
+    // SUCCESSFUL PRINT
     // ======================================
 
-    if (
-        status === "completed"
-    ) {
+    if (status === "completed") {
 
-        attendee.status =
-            "Checked In";
-
-
-        // Update queue record
-        const job =
-            printQueue.find(
-                item =>
-                    item.printJobId ===
-                    printJobId
-            );
-
-
-        if (job) {
-
-            job.status =
-                "completed";
-
-            job.completedAt =
-                new Date().toISOString();
-
-        }
+        attendee.status = "Checked In";
 
 
         console.log(
+
             `Badge printed successfully for ${attendee.name}`
+
         );
 
 
@@ -311,8 +231,7 @@ app.post("/printer-webhook", (req, res) => {
             message:
                 "Print confirmed. Attendee is now checked in.",
 
-            attendee:
-                attendee
+            attendee: attendee
 
         });
 
@@ -320,34 +239,12 @@ app.post("/printer-webhook", (req, res) => {
 
 
     // ======================================
-    // PRINT FAILED
+    // FAILED PRINT
     // ======================================
 
-    if (
-        status === "failed"
-    ) {
+    if (status === "failed") {
 
-        attendee.status =
-            "Not Checked In";
-
-
-        const job =
-            printQueue.find(
-                item =>
-                    item.printJobId ===
-                    printJobId
-            );
-
-
-        if (job) {
-
-            job.status =
-                "failed";
-
-            job.completedAt =
-                new Date().toISOString();
-
-        }
+        attendee.status = "Not Checked In";
 
 
         return res.json({
@@ -355,22 +252,16 @@ app.post("/printer-webhook", (req, res) => {
             message:
                 "Badge printing failed. Attendee remains unchecked in.",
 
-            attendee:
-                attendee
+            attendee: attendee
 
         });
 
     }
 
 
-    // ======================================
-    // UNKNOWN STATUS
-    // ======================================
+    res.status(400).json({
 
-    return res.status(400).json({
-
-        message:
-            "Unknown print status"
+        message: "Unknown print status"
 
     });
 
@@ -378,7 +269,7 @@ app.post("/printer-webhook", (req, res) => {
 
 
 // ==========================================
-// SIMULATE PRINTER
+// SIMULATE PRINTER PROCESSING
 // ==========================================
 
 app.post("/simulate-printer", (req, res) => {
@@ -389,114 +280,51 @@ app.post("/simulate-printer", (req, res) => {
     } = req.body;
 
 
-    // Find print job
-    const job =
-        printQueue.find(
-            item =>
-                item.printJobId ===
-                printJobId
-        );
+    const job = printQueue.find(
+        item => item.printJobId === printJobId
+    );
 
 
     if (!job) {
 
         return res.status(404).json({
 
-            message:
-                "Print job not found"
+            message: "Print job not found"
 
         });
 
     }
 
 
-    // ======================================
-    // SEND CALLBACK THROUGH WEBHOOK
-    // ======================================
-
-    const attendee =
-        attendees.get(
-            job.attendeeId
-        );
+    job.status = status;
 
 
-    if (!attendee) {
-
-        return res.status(404).json({
-
-            message:
-                "Attendee not found"
-
-        });
-
-    }
+    // Simulate the vendor calling our webhook
+    const attendee = attendees.get(job.attendeeId);
 
 
-    // Simulate vendor callback
-    attendee.status =
-        status === "completed"
-            ? "Checked In"
-            : "Not Checked In";
+    if (attendee) {
 
+        if (status === "completed") {
 
-    job.status =
-        status;
+            attendee.status = "Checked In";
 
+        } else if (status === "failed") {
 
-    res.json({
-
-        message:
-            "Printer callback simulated successfully",
-
-        printJob:
-            job,
-
-        attendee:
-            attendee
-
-    });
-
-});
-
-
-// ==========================================
-// RESET DEMO DATA
-// ==========================================
-
-app.post("/reset-demo", (req, res) => {
-
-    attendees.forEach(
-        attendee => {
-
-            attendee.status =
-                "Not Checked In";
-
-            attendee.printJobId =
-                null;
+            attendee.status = "Not Checked In";
 
         }
-    );
 
-
-    // Clear message queue
-    printQueue.length =
-        0;
-
-
-    console.log(
-        "Demo data reset successfully"
-    );
+    }
 
 
     res.json({
 
-        message:
-            "Demo data reset successfully",
+        message: "Printer callback simulated successfully",
 
-        attendees:
-            Array.from(
-                attendees.values()
-            )
+        printJob: job,
+
+        attendee: attendee
 
     });
 
@@ -507,17 +335,13 @@ app.post("/reset-demo", (req, res) => {
 // SERVER
 // ==========================================
 
-const PORT =
-    process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
 
-app.listen(
-    PORT,
-    () => {
+app.listen(PORT, () => {
 
-        console.log(
-            `Solstice Events check-in service running on port ${PORT}`
-        );
+    console.log(
+        `Solstice Events check-in service running on port ${PORT}`
+    );
 
-    }
-);
+});
